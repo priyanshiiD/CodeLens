@@ -1,0 +1,49 @@
+# Virtual Environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Cache
+__pycache__/
+.pytest_cache/
+*.pyc
+ .mypy_cache/
+ .python-version
+ pip-wheel-metadata/
+ build/
+ dist/
+ *.egg-info/
+ .coverage
+ coverage.xml
+ htmlcov/
+ .cache/
+ .ipynb_checkpoints/
+ *.sqlite3
+ *.sqlite
+ *.db
+ frontend/node_modules/
+ npm-debug.log*
+ yarn-error.log*
+ .terraform/
+ celerybeat-schedule
+ *.pem
+ *.key
