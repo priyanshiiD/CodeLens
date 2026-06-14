@@ -1,8 +1,8 @@
 services:
 
-  # ── PostgreSQL Database ──────────────────────────────────
+  # ── PostgreSQL Database (pgvector/pgvector:pg16 has vector extension built-in)
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: codelens
@@ -19,17 +19,20 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── RAG Service (Python + FastAPI) ───────────────────────
+  # ── RAG Service (Python + FastAPI + pgvector) ─────────────────────────────
   rag-service:
     build: ./rag-service
     restart: unless-stopped
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/codelens
     volumes:
-      - chroma_data:/app/chroma_db   # Persist vector store
       - repo_cache:/tmp/repos        # Persist cloned repos cache
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -37,7 +40,7 @@ services:
       retries: 5
       start_period: 20s
 
-  # ── Backend API (Node.js + Express) ─────────────────────
+  # ── Backend API (Node.js + Express) ──────────────────────────────────────
   backend:
     build: ./backend
     restart: unless-stopped
@@ -54,7 +57,7 @@ services:
       rag-service:
         condition: service_healthy
 
-  # ── Frontend (React + nginx) ─────────────────────────────
+  # ── Frontend (React + nginx) ──────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -68,5 +71,4 @@ services:
 
 volumes:
   postgres_data:   # PostgreSQL data
-  chroma_data:     # ChromaDB vector store
   repo_cache:      # Cloned GitHub repos cache

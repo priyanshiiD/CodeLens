@@ -9,7 +9,7 @@ from google import genai
 from dotenv import load_dotenv
 
 from app.services.embedder import embed_text
-from app.vectorstore.chroma import retrieve_chunks
+from app.vectorstore.pgvector import retrieve_chunks
 
 # Load environment variables
 load_dotenv()

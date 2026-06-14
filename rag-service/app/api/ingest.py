@@ -1,6 +1,6 @@
 """
 Repository ingestion API for CodeLens RAG service.
-Handles cloning, chunking, embedding, and storing code in ChromaDB.
+Handles cloning, chunking, embedding, and storing code in pgvector (PostgreSQL).
 """
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -11,7 +11,7 @@ import traceback
 from app.services.github_loader import clone_repo, get_code_files
 from app.services.chunker import chunk_file
 from app.services.embedder import embed_chunks_batch
-from app.vectorstore.chroma import store_chunks, delete_repo, get_repo_stats, get_collection
+from app.vectorstore.pgvector import store_chunks, delete_repo, get_repo_stats, get_all_indexed_repos
 
 # Router setup
 router = APIRouter(prefix="/ingest", tags=["ingest"])
@@ -22,40 +22,23 @@ ingestion_status = {}
 
 async def restore_ingestion_status() -> None:
     """
-    Startup function: Restore ingestion status from ChromaDB.
-    
-    Queries the ChromaDB collection, extracts all unique repo_urls
-    from metadata, and sets their status to "completed".
+    Startup function: Restore ingestion status from PostgreSQL chunks table.
+
+    Queries distinct repo_urls from the chunks table and marks them
+    as 'completed' in the in-memory ingestion_status dict.
     """
     try:
-        print("Restoring ingestion status from ChromaDB...")
-        collection = get_collection()
-        
-        # Get all documents from collection
-        all_docs = collection.get()
-        
-        if not all_docs or not all_docs.get("metadatas"):
-            print("No documents found in ChromaDB")
-            return
-        
-        # Extract unique repo_urls from metadata
-        unique_repos = set()
-        for metadata in all_docs["metadatas"]:
-            if metadata and "repo_url" in metadata:
-                unique_repos.add(metadata["repo_url"])
-        
-        # Set status to completed for each repo
-        for repo_url in unique_repos:
+        print("Restoring ingestion status from PostgreSQL...")
+        repos = get_all_indexed_repos()
+
+        for repo_url in repos:
             status_key = quote(repo_url, safe="")
             ingestion_status[status_key] = "completed"
             print(f"  Restored: {repo_url}")
-            print(f"    Key: {status_key}")
-        
-        print(f"Restored {len(unique_repos)} repositories from ChromaDB")
-        print(f"Ingestion status keys: {list(ingestion_status.keys())}")
-    
+
+        print(f"Restored {len(repos)} repositories from PostgreSQL")
     except Exception as e:
-        print(f"Error restoring ingestion status: {str(e)}")
+        print(f"Error restoring ingestion status: {e}")
         print("Continuing startup anyway...")
 
 

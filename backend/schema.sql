@@ -2,6 +2,9 @@
 -- Run this against a PostgreSQL database to initialize CodeLens.
 -- Usage: psql -U postgres -d codelens -f backend/schema.sql
 
+-- Enable pgvector extension (required for vector similarity search)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id         SERIAL PRIMARY KEY,
@@ -35,10 +38,25 @@ CREATE TABLE IF NOT EXISTS chat_history (
   created_at  TIMESTAMP DEFAULT NOW()
 );
 
+-- Chunks table (vector storage — replaces ChromaDB)
+CREATE TABLE IF NOT EXISTS chunks (
+  id         SERIAL PRIMARY KEY,
+  chunk_id   TEXT UNIQUE NOT NULL,
+  repo_url   TEXT NOT NULL,
+  file_path  TEXT NOT NULL,
+  start_line INTEGER NOT NULL DEFAULT 0,
+  end_line   INTEGER NOT NULL DEFAULT 0,
+  language   TEXT DEFAULT 'unknown',
+  text       TEXT NOT NULL,
+  embedding  vector(768),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_repos_user_id        ON repos(user_id);
+CREATE INDEX IF NOT EXISTS idx_repos_user_id          ON repos(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_history_user_repo ON chat_history(user_id, repo_id);
-CREATE INDEX IF NOT EXISTS idx_chat_history_created  ON chat_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_history_created   ON chat_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_chunks_repo_url        ON chunks(repo_url);
 
 -- Demo user seed (password: test123)
 INSERT INTO users (email, password, name)
