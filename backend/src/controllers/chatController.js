@@ -41,8 +41,8 @@ async function askQuestion(req, res) {
 
     // Save to chat_history
     await pool.query(
-      'INSERT INTO chat_history (user_id, repo_id, question, answer, sources) VALUES ($1, $2, $3, $4, $5)',
-      [userId, repoId, question, answer, JSON.stringify(sources || [])]
+      'INSERT INTO chat_history (user_id, repo_id, question, answer, sources, chunks_used) VALUES ($1, $2, $3, $4, $5, $6)',
+      [userId, repoId, question, answer, JSON.stringify(sources || []), chunks_used || 0]
     );
 
     return res.json({ answer, sources, chunks_used });
@@ -75,11 +75,11 @@ async function getChatHistory(req, res) {
 
     // Get chat history (last 20)
     const result = await pool.query(
-      'SELECT id, question, answer, sources, created_at FROM chat_history WHERE user_id = $1 AND repo_id = $2 ORDER BY created_at DESC LIMIT 20',
+      'SELECT id, question, answer, sources, chunks_used, created_at FROM chat_history WHERE user_id = $1 AND repo_id = $2 ORDER BY created_at DESC LIMIT 20',
       [userId, repoId]
     );
 
-    return res.json(result.rows);
+    return res.json(result.rows.reverse());
   } catch (err) {
     console.error('Get chat history error:', err);
     return res.status(500).json({ error: 'Internal server error' });

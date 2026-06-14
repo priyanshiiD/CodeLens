@@ -1,64 +1,51 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { setUnauthorizedHandler } from './api/client';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
-import './App.css';
+import NotFound from './pages/NotFound';
+import Spinner from './components/ui/Spinner';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen bg-[#0d1117] flex items-center justify-center"><Spinner /></div>;
+  if (!user) return <Navigate to="/" replace />;
+  return children;
+}
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0D0D0D]">
-        <div className="text-white text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
-
+function PublicRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen bg-[#0d1117] flex items-center justify-center"><Spinner /></div>;
+  if (user) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
 function AppRoutes() {
+  const { logout } = useAuth();
+  useEffect(() => { setUnauthorizedHandler(() => { logout(); window.location.href = '/'; }); }, [logout]);
+
   return (
-    <div className="bg-[#0D0D0D] min-h-screen">
+    <div className="app-bg min-h-screen">
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute>
-              <Chat />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
-      <Toaster position="top-center" />
+      <Toaster position="top-right" toastOptions={{
+        style: { background: '#161b22', color: '#e6edf3', border: '1px solid #30363d', borderRadius: '8px', fontSize: '13px', fontFamily: 'Inter, sans-serif', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' },
+        success: { iconTheme: { primary: '#3fb950', secondary: '#161b22' } },
+        error: { iconTheme: { primary: '#f85149', secondary: '#161b22' } },
+      }} />
     </div>
   );
 }
 
 export default function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
-  );
+  return <BrowserRouter><AuthProvider><AppRoutes /></AuthProvider></BrowserRouter>;
 }

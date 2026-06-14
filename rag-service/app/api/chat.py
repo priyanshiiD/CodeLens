@@ -144,7 +144,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
 
-@router.get("/history/{repo_url}", response_model=HistoryResponse)
+@router.get("/history/{repo_url:path}", response_model=HistoryResponse)
 async def get_chat_history(repo_url: str) -> HistoryResponse:
     """
     Get chat history for a repository.
@@ -190,7 +190,7 @@ async def get_chat_history(repo_url: str) -> HistoryResponse:
     )
 
 
-@router.delete("/history/{repo_url}")
+@router.delete("/history/{repo_url:path}")
 async def clear_chat_history(repo_url: str) -> dict:
     """
     Clear chat history for a repository.

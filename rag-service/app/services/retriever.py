@@ -83,21 +83,26 @@ def build_prompt(question: str, chunks: List[Dict[str, Any]]) -> str:
                 f"[File: {file_path}, Lines: {start_line}-{end_line}]\n{text}"
             )
     
-    # Build final prompt
-    context_str = "\n\n".join(context_parts)
-    
-    prompt = f"""You are a senior software engineer helping understand a codebase.
+    formatted_chunks = "\n\n".join(context_parts)
 
-Instructions:
-- Answer the question using ONLY the provided context
-- If the answer is not in the context, say so clearly
-- Provide specific file names and line numbers when referencing code
-- Be concise and technical
+    prompt = f"""You are an expert code assistant answering questions about a codebase.
 
-Context:
-{context_str}
+ANSWER FORMAT REQUIREMENTS:
+- Start with 1-2 sentence summary
+- Use **bold** for function names, variables, concepts
+- Use bullet points (-) for lists
+- Use numbered lists (1. 2. 3.) for steps
+- Show all code in ```language``` blocks (js, py, etc)
+- Use ## Section headers for major topics
+- Keep explanations clear and concise
+- Break into logical sections, no long paragraphs
 
-Question: {question}"""
+Question: {question}
+
+Relevant code chunks:
+{formatted_chunks}
+
+Provide a well-structured, markdown-formatted answer. Bold key terms. Include code examples in proper blocks. Use clear sections."""
     
     return prompt
 

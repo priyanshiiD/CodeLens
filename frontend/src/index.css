@@ -1,1 +1,343 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
 @import "tailwindcss";
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: 'Inter', -apple-system, sans-serif;
+
+  /* GitHub Dark Dimmed — Professional Charcoal Palette */
+  --color-cl-bg:          #0d1117;  /* GitHub canvas default */
+  --color-cl-bg-elevated: #161b22;  /* GitHub canvas overlay */
+  --color-cl-surface:     #1c2128;  /* GitHub canvas inset */
+  --color-cl-surface-2:   #21262d;  /* GitHub canvas subtle */
+  --color-cl-surface-3:   #30363d;  /* GitHub border default */
+
+  --color-cl-border:         #21262d;
+  --color-cl-border-light:   #30363d;
+  --color-cl-border-highlight: #388bfd;
+
+  --color-cl-text:           #e6edf3;  /* GitHub fg default */
+  --color-cl-text-secondary: #c9d1d9;  /* GitHub fg muted */
+  --color-cl-text-muted:     #8b949e;  /* GitHub fg subtle */
+  --color-cl-text-dim:       #6e7681;  /* GitHub fg subtler */
+
+  --color-cl-accent:         #58a6ff;  /* GitHub accent fg */
+  --color-cl-accent-hover:   #79c0ff;
+  --color-cl-accent-dim:     #1f6feb;  /* GitHub accent emphasis */
+  --color-cl-accent-soft:    rgba(56, 139, 253, 0.15);
+  --color-cl-accent-glow:    rgba(56, 139, 253, 0.08);
+
+  /* Supporting spectrum */
+  --color-cl-blue:    #58a6ff;
+  --color-cl-indigo:  #a5b4fc;
+  --color-cl-purple:  #d2a8ff;
+  --color-cl-green:   #3fb950;
+  --color-cl-teal:    #2dd4bf;
+
+  /* Status colors */
+  --color-cl-success:      #3fb950;
+  --color-cl-success-dim:  #238636;
+  --color-cl-success-soft: rgba(63, 185, 80, 0.12);
+
+  --color-cl-warning:      #d29922;
+  --color-cl-warning-dim:  #9e6a03;
+  --color-cl-warning-soft: rgba(210, 153, 34, 0.12);
+
+  --color-cl-error:      #f85149;
+  --color-cl-error-dim:  #da3633;
+  --color-cl-error-soft: rgba(248, 81, 73, 0.12);
+
+  /* Radius */
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+}
+
+/* ─────────────────────────────────────────────
+   Base Reset & Body
+───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-cl-bg);
+  color: var(--color-cl-text);
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  font-size: 14px;
+}
+
+/* ─────────────────────────────────────────────
+   App-wide Premium Background
+   (Dashboard, Chat — matches auth page feel)
+───────────────────────────────────────────── */
+.app-bg {
+  background: radial-gradient(ellipse 110% 70% at 70% -5%, #0d1f3c 0%, #080d14 50%, #010409 100%);
+  position: relative;
+}
+.app-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+  background-size: 26px 26px;
+  pointer-events: none;
+  z-index: 0;
+}
+.app-bg::after {
+  content: '';
+  position: fixed;
+  width: 900px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(56,139,253,0.10) 0%, rgba(56,139,253,0.03) 50%, transparent 70%);
+  top: -250px;
+  right: -200px;
+  pointer-events: none;
+  z-index: 0;
+}
+.app-bg > * { position: relative; z-index: 1; }
+
+/* ─────────────────────────────────────────────
+   Webkit Autofill Override
+───────────────────────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #1c2128 inset !important;
+  -webkit-text-fill-color: #e6edf3 !important;
+  caret-color: #e6edf3 !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-radius: inherit;
+}
+
+/* ─────────────────────────────────────────────
+   Scrollbars — GitHub-style thin
+───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #484f58; background-clip: content-box; border: 2px solid transparent; }
+
+/* ─────────────────────────────────────────────
+   Animations
+───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in { animation: slide-in 0.2s ease-out forwards; }
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+.animate-pulse-subtle { animation: pulse-subtle 1.6s ease-in-out infinite; }
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+
+/* ─────────────────────────────────────────────
+   Component Primitives
+───────────────────────────────────────────── */
+
+/* GitHub-style Card */
+.card {
+  background: var(--color-cl-bg-elevated);
+  border: 1px solid var(--color-cl-border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover {
+  border-color: var(--color-cl-border-light);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.35);
+}
+
+/* GitHub-style Input Field */
+.input-field {
+  width: 100%;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background: #1c2128;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-sm);
+  color: var(--color-cl-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  appearance: none;
+  outline: none;
+}
+.input-field::placeholder { color: #6e7681; }
+.input-field:focus {
+  border-color: #388bfd;
+  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.25);
+}
+.input-field:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Section Label */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-cl-text-muted);
+}
+
+/* ─────────────────────────────────────────────
+   Auth Layout Styles
+───────────────────────────────────────────── */
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(56, 139, 253, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 139, 253, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.auth-glow {
+  background: radial-gradient(ellipse 70% 50% at 30% 40%, rgba(56, 139, 253, 0.06) 0%, transparent 70%);
+}
+
+.auth-form-card {
+  background: var(--color-cl-bg-elevated);
+  border: 1px solid var(--color-cl-border);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04);
+}
+
+@media (min-width: 1024px) {
+  .auth-form-card { padding: 32px 40px 28px; }
+}
+
+/* ─────────────────────────────────────────────
+   Markdown Content Rendering
+───────────────────────────────────────────── */
+.markdown-content {
+  line-height: 1.75;
+  font-size: 14px;
+  color: var(--color-cl-text-secondary);
+}
+.markdown-content > *:first-child { margin-top: 0; }
+.markdown-content p { margin-bottom: 14px; }
+.markdown-content p:last-child { margin-bottom: 0; }
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  font-weight: 600;
+  color: var(--color-cl-text);
+  margin-top: 24px;
+  margin-bottom: 12px;
+  line-height: 1.25;
+}
+.markdown-content h1 { font-size: 1.5rem; padding-bottom: 8px; border-bottom: 1px solid var(--color-cl-border); }
+.markdown-content h2 { font-size: 1.25rem; padding-bottom: 6px; border-bottom: 1px solid var(--color-cl-border); }
+.markdown-content h3 { font-size: 1.05rem; }
+
+.markdown-content ul, .markdown-content ol {
+  margin: 6px 0 16px 20px;
+}
+.markdown-content li { margin-bottom: 4px; }
+.markdown-content li::marker { color: var(--color-cl-text-muted); }
+
+.markdown-content code {
+  background: rgba(56, 139, 253, 0.1);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  color: #79c0ff;
+  border: 1px solid rgba(56, 139, 253, 0.2);
+}
+
+.markdown-content pre {
+  background: #161b22;
+  border: 1px solid var(--color-cl-border-light);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.markdown-content pre code {
+  background: transparent;
+  padding: 0;
+  color: #e6edf3;
+  font-size: 13px;
+  border: none;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #388bfd;
+  padding: 6px 0 6px 16px;
+  margin: 16px 0;
+  color: var(--color-cl-text-muted);
+  background: rgba(56, 139, 253, 0.05);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown-content a {
+  color: var(--color-cl-accent);
+  text-decoration: none;
+}
+.markdown-content a:hover { text-decoration: underline; }
+.markdown-content strong { color: var(--color-cl-text); font-weight: 600; }
+.markdown-content em { color: var(--color-cl-text-secondary); }
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--color-cl-border-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-content th {
+  background: var(--color-cl-surface-2);
+  color: var(--color-cl-text);
+  font-weight: 600;
+}
+.markdown-content tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+/* ─────────────────────────────────────────────
+   Tech Grid (used in certain bg overlays)
+───────────────────────────────────────────── */
+.tech-grid {
+  background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

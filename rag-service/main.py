@@ -4,16 +4,29 @@ CodeLens - RAG-based codebase intelligence FastAPI service.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import uvicorn
 
-from app.api.ingest import router as ingest_router
+from app.api.ingest import router as ingest_router, restore_ingestion_status
 from app.api.chat import router as chat_router
 
-# Create FastAPI app
+
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage app lifecycle - restore state on startup."""
+    # Startup: restore ingestion status from ChromaDB
+    await restore_ingestion_status()
+    yield
+    # Shutdown: cleanup if needed
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="CodeLens",
     description="RAG-based codebase intelligence service for understanding codebases",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS middleware

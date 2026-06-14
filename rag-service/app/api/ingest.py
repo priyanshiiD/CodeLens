@@ -11,13 +11,52 @@ import traceback
 from app.services.github_loader import clone_repo, get_code_files
 from app.services.chunker import chunk_file
 from app.services.embedder import embed_chunks_batch
-from app.vectorstore.chroma import store_chunks, delete_repo, get_repo_stats
+from app.vectorstore.chroma import store_chunks, delete_repo, get_repo_stats, get_collection
 
 # Router setup
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
 # Ingestion status tracker
 ingestion_status = {}
+
+
+async def restore_ingestion_status() -> None:
+    """
+    Startup function: Restore ingestion status from ChromaDB.
+    
+    Queries the ChromaDB collection, extracts all unique repo_urls
+    from metadata, and sets their status to "completed".
+    """
+    try:
+        print("Restoring ingestion status from ChromaDB...")
+        collection = get_collection()
+        
+        # Get all documents from collection
+        all_docs = collection.get()
+        
+        if not all_docs or not all_docs.get("metadatas"):
+            print("No documents found in ChromaDB")
+            return
+        
+        # Extract unique repo_urls from metadata
+        unique_repos = set()
+        for metadata in all_docs["metadatas"]:
+            if metadata and "repo_url" in metadata:
+                unique_repos.add(metadata["repo_url"])
+        
+        # Set status to completed for each repo
+        for repo_url in unique_repos:
+            status_key = quote(repo_url, safe="")
+            ingestion_status[status_key] = "completed"
+            print(f"  Restored: {repo_url}")
+            print(f"    Key: {status_key}")
+        
+        print(f"Restored {len(unique_repos)} repositories from ChromaDB")
+        print(f"Ingestion status keys: {list(ingestion_status.keys())}")
+    
+    except Exception as e:
+        print(f"Error restoring ingestion status: {str(e)}")
+        print("Continuing startup anyway...")
 
 
 # Request/Response models
@@ -74,6 +113,12 @@ def _ingest_repository(repo_url: str) -> None:
         for file_path in code_files:
             try:
                 chunks = chunk_file(file_path)
+                # Convert absolute path to repo-relative path for GitHub URLs
+                # e.g. C:/tmp/repos/express/lib/router/index.js → lib/router/index.js
+                repo_path_prefix = repo_path.replace("\\", "/").rstrip("/") + "/"
+                relative = file_path.replace("\\", "/").replace(repo_path_prefix, "")
+                for chunk in chunks:
+                    chunk["metadata"]["file_path"] = relative
                 all_chunks.extend(chunks)
             except Exception as e:
                 print(f"  Warning: Failed to chunk {file_path}: {str(e)}")
@@ -155,7 +200,7 @@ async def ingest_repository(
     )
 
 
-@router.get("/status/{repo_url}", response_model=StatusResponse)
+@router.get("/status/{repo_url:path}", response_model=StatusResponse)
 async def get_ingestion_status(repo_url: str) -> StatusResponse:
     """
     Get ingestion status for a repository.
@@ -171,9 +216,38 @@ async def get_ingestion_status(repo_url: str) -> StatusResponse:
     """
     # Decode repo_url from path
     repo_url = unquote(repo_url)
-    status_key = quote(repo_url, safe="")
     
-    if status_key not in ingestion_status:
+    # Try multiple key formats to handle encoding mismatches
+    status_key = None
+    
+    print(f"\nLooking up status for repo_url: {repo_url}")
+    print(f"Available keys in ingestion_status: {list(ingestion_status.keys())}")
+    
+    # Format 1: quote(repo_url, safe="")
+    key_format_1 = quote(repo_url, safe="")
+    print(f"  Format 1 key: {key_format_1}")
+    if key_format_1 in ingestion_status:
+        status_key = key_format_1
+        print(f"  ✓ Found with Format 1")
+    
+    # Format 2: quote(unquote(repo_url), safe="")
+    if status_key is None:
+        key_format_2 = quote(unquote(repo_url), safe="")
+        print(f"  Format 2 key: {key_format_2}")
+        if key_format_2 in ingestion_status:
+            status_key = key_format_2
+            print(f"  ✓ Found with Format 2")
+    
+    # Format 3: direct repo_url
+    if status_key is None:
+        print(f"  Format 3 key: {repo_url}")
+        if repo_url in ingestion_status:
+            status_key = repo_url
+            print(f"  ✓ Found with Format 3")
+    
+    # Not found in any format
+    if status_key is None:
+        print(f"  ✗ Not found in any format")
         raise HTTPException(
             status_code=404,
             detail=f"No ingestion record found for {repo_url}"
@@ -201,7 +275,7 @@ async def get_ingestion_status(repo_url: str) -> StatusResponse:
     )
 
 
-@router.delete("/{repo_url}", response_model=DeleteResponse)
+@router.delete("/{repo_url:path}", response_model=DeleteResponse)
 async def delete_ingested_repo(repo_url: str) -> DeleteResponse:
     """
     Delete all chunks for a repository from ChromaDB.

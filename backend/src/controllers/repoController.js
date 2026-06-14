@@ -76,14 +76,16 @@ async function getRepoStatus(req, res) {
       const encoded = encodeURIComponent(repo_url);
       const ragResponse = await axios.get(`${RAG_SERVICE_URL}/api/ingest/status/${encoded}`);
       const status = ragResponse.data.status;
+      const details = ragResponse.data.details || {};
 
-      // Update database with latest status
+      // Update database with latest status and chunks count
+      const chunksCount = details.total_chunks || 0;
       await pool.query(
-        'UPDATE repos SET status = $1 WHERE user_id = $2 AND repo_url = $3',
-        [status, userId, repo_url]
+        'UPDATE repos SET status = $1, chunks_count = $2 WHERE user_id = $3 AND repo_url = $4',
+        [status, chunksCount, userId, repo_url]
       );
 
-      return res.json({ status });
+      return res.json({ status, details });
     } catch (err) {
       console.error('RAG service status error:', err.message);
       return res.status(503).json({ error: 'RAG service unavailable' });
@@ -94,8 +96,49 @@ async function getRepoStatus(req, res) {
   }
 }
 
+async function deleteRepo(req, res) {
+  try {
+    const { repo_url } = req.query || {};
+    const userId = req.user.userId;
+
+    if (!repo_url) {
+      return res.status(400).json({ error: 'repo_url is required' });
+    }
+
+    // Verify repo belongs to user
+    const repoCheck = await pool.query(
+      'SELECT id FROM repos WHERE user_id = $1 AND repo_url = $2',
+      [userId, repo_url]
+    );
+
+    if (repoCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Repo not found' });
+    }
+
+    // Delete from database (cascades to chat_history)
+    await pool.query(
+      'DELETE FROM repos WHERE user_id = $1 AND repo_url = $2',
+      [userId, repo_url]
+    );
+
+    // Call RAG service to delete chunks
+    try {
+      const encoded = encodeURIComponent(repo_url);
+      await axios.delete(`${RAG_SERVICE_URL}/api/ingest/${encoded}`);
+    } catch (err) {
+      console.error('RAG service delete error:', err.message);
+    }
+
+    return res.json({ message: 'Repository deleted successfully' });
+  } catch (err) {
+    console.error('Delete repo error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   addRepo,
   getRepos,
   getRepoStatus,
+  deleteRepo,
 };

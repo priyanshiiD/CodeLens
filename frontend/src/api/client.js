@@ -1,10 +1,15 @@
 import axios from 'axios';
 
 const client = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
 });
 
-// Request interceptor to add Authorization header
+let onUnauthorized = null;
+
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler;
+}
+
 client.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('codelens_token');
@@ -16,7 +21,20 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Auth functions
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const url = error.config?.url || '';
+    const isAuthRoute = url.includes('/api/auth/');
+    // Only trigger logout redirect for 401s on protected routes,
+    // NOT on login/register — those need to bubble the error to the form
+    if (error.response?.status === 401 && onUnauthorized && !isAuthRoute) {
+      onUnauthorized();
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function login(email, password) {
   const response = await client.post('/api/auth/login', { email, password });
   return response.data;
@@ -27,7 +45,6 @@ export async function register(name, email, password) {
   return response.data;
 }
 
-// Repo functions
 export async function getRepos() {
   const response = await client.get('/api/repos');
   return response.data;
@@ -43,7 +60,6 @@ export async function getRepoStatus(repo_url) {
   return response.data;
 }
 
-// Chat functions
 export async function askQuestion(repo_url, question) {
   const response = await client.post('/api/chat', { repo_url, question });
   return response.data;
@@ -51,5 +67,10 @@ export async function askQuestion(repo_url, question) {
 
 export async function getChatHistory(repo_url) {
   const response = await client.get('/api/chat/history', { params: { repo_url } });
+  return response.data;
+}
+
+export async function deleteRepo(repo_url) {
+  const response = await client.delete('/api/repos', { params: { repo_url } });
   return response.data;
 }

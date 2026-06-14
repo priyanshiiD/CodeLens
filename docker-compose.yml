@@ -1,0 +1,72 @@
+services:
+
+  # ── PostgreSQL Database ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codelens
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d codelens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── RAG Service (Python + FastAPI) ───────────────────────
+  rag-service:
+    build: ./rag-service
+    restart: unless-stopped
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    volumes:
+      - chroma_data:/app/chroma_db   # Persist vector store
+      - repo_cache:/tmp/repos        # Persist cloned repos cache
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ── Backend API (Node.js + Express) ─────────────────────
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/codelens
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      RAG_SERVICE_URL: http://rag-service:8000
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rag-service:
+        condition: service_healthy
+
+  # ── Frontend (React + nginx) ─────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3000   # Browser calls backend on host port
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:   # PostgreSQL data
+  chroma_data:     # ChromaDB vector store
+  repo_cache:      # Cloned GitHub repos cache

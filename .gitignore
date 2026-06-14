@@ -1,49 +1,62 @@
-# Virtual Environment
+# ─── Environment ──────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ─── Python ───────────────────────────────────
 venv/
 .venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+coverage.xml
+htmlcov/
 
-# IDE
+# ─── Node ─────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Build output ─────────────────────────────
+frontend/dist/
+frontend/build/
+
+# ─── Vector DB (local ChromaDB data) ──────────
+rag-service/chroma_db/
+chroma_db/
+
+# ─── Cloned repos (temp data) ─────────────────
+repos/
+
+# ─── IDE ──────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# ─── OS ───────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Dependencies
-node_modules/
-
-# Logs
+# ─── Logs ─────────────────────────────────────
 *.log
+logs/
 
-# Environment
-.env
-.env.local
-
-# Cache
-__pycache__/
-.pytest_cache/
-*.pyc
- .mypy_cache/
- .python-version
- pip-wheel-metadata/
- build/
- dist/
- *.egg-info/
- .coverage
- coverage.xml
- htmlcov/
- .cache/
- .ipynb_checkpoints/
- *.sqlite3
- *.sqlite
- *.db
- frontend/node_modules/
- npm-debug.log*
- yarn-error.log*
- .terraform/
- celerybeat-schedule
- *.pem
- *.key
+# ─── Misc ─────────────────────────────────────
+*.pem
+*.key
+*.sqlite3
+*.sqlite
+*.db
+.cache/
+.ipynb_checkpoints/
