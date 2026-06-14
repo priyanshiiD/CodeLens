@@ -52,53 +52,21 @@ class HistoryResponse(BaseModel):
 
 @router.post("", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Ask a question about an ingested repository.
-
-    Args:
-        request: Chat request with repo_url, question, and n_results
-
-    Returns:
-        Chat response with answer, sources, and metadata
-
-    Raises:
-        HTTPException: If repo not ingested or question fails
-    """
     # Validate inputs
     if not request.repo_url or not isinstance(request.repo_url, str):
         raise HTTPException(status_code=400, detail="Invalid repo_url")
-    
     if not request.question or not isinstance(request.question, str):
         raise HTTPException(status_code=400, detail="Invalid question")
-    
     if request.n_results < 1 or request.n_results > 20:
-        raise HTTPException(
-            status_code=400,
-            detail="n_results must be between 1 and 20"
-        )
-    
-    # Check if repository has been ingested
+        raise HTTPException(status_code=400, detail="n_results must be between 1 and 20")
+
+    # Check in-memory status only for actively processing repos (not for already-indexed ones)
     status_key = quote(request.repo_url, safe="")
-    
-    if status_key not in ingestion_status:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Repository not ingested yet. Please ingest {request.repo_url} first using POST /ingest"
-        )
-    
-    repo_status = ingestion_status[status_key]
-    
+    repo_status = ingestion_status.get(status_key)
     if repo_status == "processing":
-        raise HTTPException(
-            status_code=503,
-            detail=f"Repository {request.repo_url} is still being processed. Please try again later."
-        )
-    
+        raise HTTPException(status_code=503, detail=f"Repository is still being processed. Please wait.")
     if repo_status == "failed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Repository {request.repo_url} ingestion failed. Please try ingesting again."
-        )
+        raise HTTPException(status_code=400, detail=f"Repository ingestion failed. Please try ingesting again.")
     
     # Ask question
     try:

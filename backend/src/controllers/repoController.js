@@ -71,23 +71,48 @@ async function getRepoStatus(req, res) {
       return res.status(404).json({ error: 'Repo not found' });
     }
 
+
     // Call RAG service for status
     try {
       const encoded = encodeURIComponent(repo_url);
       const ragResponse = await axios.get(`${RAG_SERVICE_URL}/api/ingest/status/${encoded}`);
-      const status = ragResponse.data.status;
+      let status = ragResponse.data.status;
       const details = ragResponse.data.details || {};
 
-      // Update database with latest status and chunks count
-      const chunksCount = details.total_chunks || 0;
-      await pool.query(
-        'UPDATE repos SET status = $1, chunks_count = $2 WHERE user_id = $3 AND repo_url = $4',
-        [status, chunksCount, userId, repo_url]
+      // If RAG says "processing" but DB already has "completed",
+      // the service was restarted — trust the DB (vectors are still in ChromaDB)
+      const dbRow = await pool.query(
+        'SELECT status, chunks_count FROM repos WHERE user_id = $1 AND repo_url = $2',
+        [userId, repo_url]
       );
+      const dbStatus = dbRow.rows[0]?.status;
+      const dbChunks = dbRow.rows[0]?.chunks_count || 0;
+
+      if (status === 'processing' && dbStatus === 'completed') {
+        status = 'completed';
+        details.total_chunks = dbChunks;
+      }
+
+      // Update database with latest status and chunks count (only if changing)
+      if (status !== dbStatus) {
+        const chunksCount = details.total_chunks || 0;
+        await pool.query(
+          'UPDATE repos SET status = $1, chunks_count = $2 WHERE user_id = $3 AND repo_url = $4',
+          [status, chunksCount, userId, repo_url]
+        );
+      }
 
       return res.json({ status, details });
     } catch (err) {
       console.error('RAG service status error:', err.message);
+      // Fallback: return DB status if RAG is unavailable
+      const dbRow = await pool.query(
+        'SELECT status, chunks_count FROM repos WHERE user_id = $1 AND repo_url = $2',
+        [userId, repo_url]
+      );
+      if (dbRow.rows[0]) {
+        return res.json({ status: dbRow.rows[0].status, details: { total_chunks: dbRow.rows[0].chunks_count } });
+      }
       return res.status(503).json({ error: 'RAG service unavailable' });
     }
   } catch (err) {
