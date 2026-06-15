@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   end_line   INTEGER NOT NULL DEFAULT 0,
   language   TEXT DEFAULT 'unknown',
   text       TEXT NOT NULL,
-  embedding  vector(768),
+  embedding  vector(3072),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
