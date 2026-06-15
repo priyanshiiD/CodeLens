@@ -29,7 +29,6 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     try {
-      setLoading(true);
       const { token: newToken, user: newUser } = await apiClient.login(email, password);
 
       localStorage.setItem('codelens_token', newToken);
@@ -42,14 +41,11 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: error.response?.data?.error || 'Login failed' };
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const register = useCallback(async (name, email, password) => {
     try {
-      setLoading(true);
       const { token: newToken, user: newUser } = await apiClient.register(name, email, password);
 
       localStorage.setItem('codelens_token', newToken);
@@ -62,8 +58,6 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Register error:', error);
       return { success: false, error: error.response?.data?.error || 'Registration failed' };
-    } finally {
-      setLoading(false);
     }
   }, []);
 

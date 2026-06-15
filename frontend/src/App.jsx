@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { setUnauthorizedHandler } from './api/client';
@@ -26,7 +26,13 @@ function PublicRoute({ children }) {
 
 function AppRoutes() {
   const { logout } = useAuth();
-  useEffect(() => { setUnauthorizedHandler(() => { logout(); window.location.href = '/'; }); }, [logout]);
+  const navigate = useNavigate();
+  useEffect(() => { 
+    setUnauthorizedHandler(() => { 
+      logout(); 
+      navigate('/'); 
+    }); 
+  }, [logout, navigate]);
 
   return (
     <div className="app-bg min-h-screen">

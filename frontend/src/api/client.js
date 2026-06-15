@@ -25,9 +25,9 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error.config?.url || '';
-    const isAuthRoute = url.includes('/api/auth/');
-    // Only trigger logout redirect for 401s on protected routes,
-    // NOT on login/register — those need to bubble the error to the form
+    // Prevent 401 redirects if the request was to login/register endpoints
+    const isAuthRoute = url.includes('/login') || url.includes('/register') || url.includes('auth');
+    
     if (error.response?.status === 401 && onUnauthorized && !isAuthRoute) {
       onUnauthorized();
     }
