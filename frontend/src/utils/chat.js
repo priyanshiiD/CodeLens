@@ -1,7 +1,6 @@
 export function formatChatHistory(data) {
   return data
     .slice()
-    .reverse()
     .flatMap((item) => {
       let sources = item.sources || [];
       if (typeof sources === 'string') {

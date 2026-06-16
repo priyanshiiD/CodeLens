@@ -58,10 +58,11 @@ async function getChatHistory(req, res) {
     const userId = req.user.userId;
 
     if (!repo_url) {
-      return res.status(400).json({ error: 'repo_url query param is required' });
+      return res.status(400).json({ error: 'repo_url is required' });
     }
 
-    // Get repo
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
     const repoCheck = await pool.query(
       'SELECT id FROM repos WHERE user_id = $1 AND repo_url = $2',
       [userId, repo_url]

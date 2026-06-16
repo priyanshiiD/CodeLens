@@ -41,7 +41,6 @@ export default function Chat() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setActiveHistoryId(id);
     setSidebarOpen(false);
-    setActiveTab('chat');
   }, []);
 
   // Auto-grow textarea
