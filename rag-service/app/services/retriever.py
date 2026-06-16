@@ -212,8 +212,12 @@ def ask(
         }
     
     except ValueError as e:
+        import traceback
+        traceback.print_exc()
         raise ValueError(f"Invalid input: {str(e)}")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise Exception(f"Failed to answer question: {str(e)}")
 
 
