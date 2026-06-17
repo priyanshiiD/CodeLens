@@ -147,32 +147,54 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return embedded_chunks
 
 
+def embed_text_batch(texts: List[str], retries: int = 0) -> List[List[float]]:
+    """
+    Generate embeddings for a list of texts in a single batch request to Google AI.
+    """
+    if not texts:
+        return []
+    
+    try:
+        client = get_client()
+        response = client.models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=texts,
+        )
+        
+        if not response.embeddings:
+            raise ValueError("No embeddings returned from API")
+            
+        return [emb.values for emb in response.embeddings]
+        
+    except Exception as e:
+        if retries < MAX_RETRIES:
+            delay = 5 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) else RETRY_DELAY
+            print(
+                f"Batch embedding failed (attempt {retries + 1}/{MAX_RETRIES}), "
+                f"retrying in {delay}s... Error: {str(e)}"
+            )
+            time.sleep(delay)
+            return embed_text_batch(texts, retries + 1)
+        else:
+            raise Exception(
+                f"Failed to embed text batch after {MAX_RETRIES} attempts: {str(e)}"
+            )
+
+
 def embed_chunks_batch(
     chunks: List[Dict[str, Any]], 
-    batch_size: int = 10,
-    delay_between_batches: float = 0.1
+    batch_size: int = 15,
+    delay_between_batches: float = 4.0
 ) -> List[Dict[str, Any]]:
     """
-    Embed chunks in batches with delay to avoid rate limiting.
-
-    Args:
-        chunks: List of chunk dicts from chunker.py
-        batch_size: Number of chunks to process in each batch
-        delay_between_batches: Delay in seconds between batches
-
-    Returns:
-        Updated chunks list with embedding vectors
-
-    Raises:
-        ValueError: If chunks is empty or invalid
-        Exception: If embedding process fails
+    Embed chunks in batches using native batching to avoid Gemini 15 RPM rate limit.
     """
     if not chunks or not isinstance(chunks, list):
         raise ValueError("Chunks must be a non-empty list")
     
     print(
         f"Starting batch embedding of {len(chunks)} chunks "
-        f"(batch size: {batch_size})..."
+        f"(batch size: {batch_size}, delay: {delay_between_batches}s)..."
     )
     embedded_chunks = []
     
@@ -180,23 +202,25 @@ def embed_chunks_batch(
         batch_end = min(batch_start + batch_size, len(chunks))
         batch = chunks[batch_start:batch_end]
         
-        for i, chunk in enumerate(batch):
-            try:
-                # Generate embedding
-                embedding = embed_text(chunk["text"])
-                
-                # Create updated chunk
-                embedded_chunk = chunk.copy()
+        # Prepare list of texts to embed
+        texts = [chunk["text"] for chunk in batch]
+        
+        try:
+            # Get embeddings in a single API request
+            embeddings = embed_text_batch(texts)
+            
+            # Match embeddings back to chunks
+            for idx, embedding in enumerate(embeddings):
+                embedded_chunk = batch[idx].copy()
                 embedded_chunk["embedding"] = embedding
                 embedded_chunks.append(embedded_chunk)
+                
+        except Exception as e:
+            print(
+                f"Error embedding batch starting at {batch_start}: {str(e)}"
+            )
+            raise
             
-            except Exception as e:
-                print(
-                    f"Error embedding chunk {batch_start + i}: {str(e)}"
-                )
-                raise
-        
-        # Print batch progress
         current_count = min(batch_end, len(chunks))
         print(
             f"Completed batch: {current_count}/{len(chunks)} chunks embedded"
@@ -205,6 +229,7 @@ def embed_chunks_batch(
         # Delay between batches (except after last batch)
         if batch_end < len(chunks):
             time.sleep(delay_between_batches)
-    
+            
     print(f"Batch embedding complete: {len(embedded_chunks)} chunks")
     return embedded_chunks
+
