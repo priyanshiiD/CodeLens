@@ -156,7 +156,7 @@ export default function Chat() {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto h-full transform transition-transform duration-200 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <div className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto h-full transform transition-transform duration-200 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} w-0 lg:w-[268px] flex-shrink-0`}>
         <ChatSidebar
           repoName={repoName}
           repoUrl={repoUrl}
