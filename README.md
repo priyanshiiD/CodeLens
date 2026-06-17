@@ -2,6 +2,8 @@
 
 > **Ask questions about any GitHub repository in plain English. Get answers with exact source citations.**
 
+🔗 **Live Demo:** [code-lens-iota.vercel.app](https://code-lens-iota.vercel.app)
+
 CodeLens is a full-stack RAG (Retrieval-Augmented Generation) application that lets you have a natural language conversation with any codebase. Paste a GitHub URL, and within minutes you can ask "How does authentication work?", "Explain the folder structure", or "Where is the database connection configured?" — and get accurate, cited answers.
 
 ---
@@ -33,23 +35,22 @@ CodeLens is a full-stack RAG (Retrieval-Augmented Generation) application that l
 └──────────┬──────────────────────────────┬──────────────┘
            │ SQL                          │ HTTP
            ▼                             ▼
-┌──────────────────┐        ┌────────────────────────────┐
-│   PostgreSQL     │        │   RAG Service (FastAPI)    │
-│                  │        │                            │
-│  · users         │        │  1. Clone repo (GitPython) │
-│  · repos         │        │  2. Chunk at fn boundaries │
-│  · chat_history  │        │  3. Embed (Gemini API)     │
-└──────────────────┘        │  4. Store in ChromaDB      │
-                            │  5. Retrieve + Generate    │
-                            │     (Gemini 2.5 Flash)     │
-                            └────────────┬───────────────┘
-                                         │
-                                         ▼
-                            ┌────────────────────────────┐
-                            │   ChromaDB (Vector Store)  │
-                            │   Cosine similarity search │
-                            │   Persisted locally        │
-                            └────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│             PostgreSQL Database (pgvector)              │
+│  · users        · repos        · chat_history           │
+│  · chunks (stores embeddings & code text)              │
+└──────────▲──────────────────────────────┬──────────────┘
+           │ SQL (Read/Write Chunks)      │
+           │                              ▼
+           │                    ┌────────────────────────┐
+           │                    │ RAG Service (FastAPI)  │
+           │                    │                        │
+           └────────────────────┼─ 1. Clone (GitPython)  │
+                                │  2. Chunk code files   │
+                                │  3. Embed (Gemini API) │
+                                │  4. Query embeddings   │
+                                │  5. LLM Answer Gen     │
+                                └────────────────────────┘
 ```
 
 ---
@@ -63,8 +64,8 @@ CodeLens is a full-stack RAG (Retrieval-Augmented Generation) application that l
 | RAG Service | Python, FastAPI, GitPython |
 | LLM | Gemini 2.5 Flash (Google AI) |
 | Embeddings | `gemini-embedding-001` |
-| Vector DB | ChromaDB (local) |
-| Database | PostgreSQL |
+| Vector DB | pgvector (PostgreSQL Extension) |
+| Database | PostgreSQL (Neon / Supabase) |
 | Auth | JWT (7-day expiry) + bcrypt |
 
 ---
@@ -197,7 +198,7 @@ CodeLens/
     └── app/
         ├── api/            # ingest.py, chat.py endpoints
         ├── services/       # chunker, embedder, retriever, github_loader
-        └── vectorstore/    # ChromaDB wrapper
+        └── vectorstore/    # pgvector database manager
 ```
 
 ---
@@ -206,13 +207,12 @@ CodeLens/
 
 | Service | Platform | Free Tier | Notes |
 |---|---|---|---|
-| **Frontend** | [Vercel](https://vercel.com) | ✅ Yes | `vercel deploy` from `/frontend` |
-| **Backend API** | [Render](https://render.com) | ✅ Yes | Sleeps after 15 min on free tier |
-| **RAG Service** | [Render](https://render.com) | ✅ Yes | Add a **Persistent Disk** for ChromaDB |
-| **PostgreSQL** | [Supabase](https://supabase.com) | ✅ 500MB | Connection string → `DATABASE_URL` |
-| **Vector DB** | ChromaDB on Render Disk | ✅ ~$1/mo | No code changes needed — just mount `/data/chroma` |
+| **Frontend** | [Vercel](https://vercel.com) | ✅ Yes | Automated Git deployments from `/frontend` |
+| **Backend API** | [Render](https://render.com) | ✅ Yes | Express API server, sleeps after 15 mins of inactivity |
+| **RAG Service** | [Render](https://render.com) | ✅ Yes | FastAPI Python server, connects to PostgreSQL |
+| **Database & Vector DB** | [Neon](https://neon.tech) / [Supabase](https://supabase.com) | ✅ Yes | PostgreSQL database with `pgvector` extension enabled |
 
-> **Note:** ChromaDB is used throughout — no Pinecone code is implemented. On Render, add a Persistent Disk (1GB = $1/month) and set `CHROMA_PATH=/data/chroma` in the RAG service environment.
+> **Note:** Embeddings are stored in the database utilizing the `pgvector` extension, removing the need for a separate vector database instance or persistent file storage on Render.
 
 ---
 
@@ -240,13 +240,6 @@ GET  /api/chat/history  — Load conversation history
 
 ---
 
-## 🧑‍💻 Author
-
-Built by **Priyanshi** — Final year BTech project demonstrating full-stack RAG engineering with React, Node.js, Python, and Google Gemini.
-
-- GitHub: [@priyanshiiD](https://github.com/priyanshiiD)
-
----
 
 ## 📄 License
 
