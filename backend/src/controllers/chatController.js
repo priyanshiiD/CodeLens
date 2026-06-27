@@ -1,7 +1,5 @@
-const axios = require('axios');
 const pool = require('../config/db');
-
-const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
+const { ragRequest } = require('../services/ragClient');
 
 async function askQuestion(req, res) {
   try {
@@ -24,17 +22,17 @@ async function askQuestion(req, res) {
 
     const repoId = repoCheck.rows[0].id;
 
-    // Call RAG service
+    // Call RAG service (retries on Render cold-start)
     let ragResponse;
     try {
-      ragResponse = await axios.post(`${RAG_SERVICE_URL}/api/chat`, {
+      ragResponse = await ragRequest('post', '/api/chat', {
         repo_url,
         question,
         n_results: 5,
       });
     } catch (err) {
-      console.error('RAG service error:', err.message);
-      return res.status(503).json({ error: 'RAG service unavailable' });
+      console.error('RAG service error after retries:', err.message);
+      return res.status(503).json({ error: 'RAG service unavailable. It may be waking up — please try again in a moment.' });
     }
 
     const { answer, sources, chunks_used } = ragResponse.data;

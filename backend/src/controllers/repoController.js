@@ -1,7 +1,5 @@
-const axios = require('axios');
 const pool = require('../config/db');
-
-const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
+const { ragRequest } = require('../services/ragClient');
 
 async function addRepo(req, res) {
   try {
@@ -15,9 +13,9 @@ async function addRepo(req, res) {
     // Extract repo name from URL (e.g., "expressjs/express" from URL)
     const repo_name = repo_url.split('/').slice(-2).join('/').replace('.git', '');
 
-    // Call RAG service to start ingestion
+    // Call RAG service to start ingestion (retries on Render cold-start)
     try {
-      await axios.post(`${RAG_SERVICE_URL}/api/ingest`, { repo_url });
+      await ragRequest('post', '/api/ingest', { repo_url });
     } catch (err) {
       console.error('RAG service error:', err.message);
       // Continue anyway - repo will be added but mark as error state
@@ -72,10 +70,10 @@ async function getRepoStatus(req, res) {
     }
 
 
-    // Call RAG service for status
+    // Call RAG service for status (retries on Render cold-start)
     try {
       const encoded = encodeURIComponent(repo_url);
-      const ragResponse = await axios.get(`${RAG_SERVICE_URL}/api/ingest/status/${encoded}`);
+      const ragResponse = await ragRequest('get', `/api/ingest/status/${encoded}`);
       let status = ragResponse.data.status;
       const details = ragResponse.data.details || {};
 
@@ -146,10 +144,10 @@ async function deleteRepo(req, res) {
       [userId, repo_url]
     );
 
-    // Call RAG service to delete chunks
+    // Call RAG service to delete chunks (retries on Render cold-start)
     try {
       const encoded = encodeURIComponent(repo_url);
-      await axios.delete(`${RAG_SERVICE_URL}/api/ingest/${encoded}`);
+      await ragRequest('delete', `/api/ingest/${encoded}`);
     } catch (err) {
       console.error('RAG service delete error:', err.message);
     }
