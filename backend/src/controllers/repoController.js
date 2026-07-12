@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { ragRequest, warmRagService } = require('../services/ragClient');
+const { ragRequest, warmRagService, isRagBlackedOut } = require('../services/ragClient');
 
 async function addRepo(req, res) {
   try {
@@ -68,6 +68,23 @@ async function getRepoStatus(req, res) {
 
     if (repoCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Repo not found' });
+    }
+
+    // If RAG service is globally blacked out (recent 429), skip RAG status request to avoid building up retries
+    if (isRagBlackedOut()) {
+      const dbRow = await pool.query(
+        'SELECT status, chunks_count, suggested_questions FROM repos WHERE user_id = $1 AND repo_url = $2',
+        [userId, repo_url]
+      );
+      if (dbRow.rows[0]) {
+        return res.json({
+          status: dbRow.rows[0].status,
+          details: {
+            total_chunks: dbRow.rows[0].chunks_count,
+            suggested_questions: dbRow.rows[0].suggested_questions || []
+          }
+        });
+      }
     }
 
     // Call RAG service for status (retries on Render cold-start)

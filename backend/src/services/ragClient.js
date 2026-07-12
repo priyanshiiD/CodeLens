@@ -2,42 +2,68 @@
  * ragClient.js
  * Axios wrapper for RAG service calls with retry + cold-start wake-up logic.
  *
- * Render free tier returns ECONNREFUSED / ERR_BAD_RESPONSE immediately when
- * a service is sleeping, but the service IS starting in the background.
- * We retry with backoff to give it time to wake up (~30-50 s on free tier).
- *
  * Key design decisions:
- *  - warmRagService() is deduplicated: concurrent callers share one in-flight
- *    promise so we never launch parallel retry chains (which trigger Render 429s).
- *  - 429 responses get a 30 s pause before the next retry instead of hammering.
- *  - ERR_BAD_RESPONSE is treated as retryable (Render sends this mid-startup).
+ *  1. warmRagService() is deduplicated: concurrent callers share one in-flight
+ *     promise so we never launch parallel retry chains.
+ *  2. Global 60-second blackout: after ANY 429 from the RAG service, ALL
+ *     subsequent ragRequest() calls fail instantly for 60 s instead of piling
+ *     up their own retry chains (which is what caused the cascade).
+ *  3. ERR_BAD_RESPONSE is treated as retryable (Render sends this mid-startup).
+ *  4. 429 responses within a chain get a 30 s pause before the next retry.
  */
 
 const axios = require('axios');
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
 
-const MAX_RETRIES     = 4;        // fewer retries → less burst on Render
+const MAX_RETRIES     = 3;        // fewer retries → less burst
 const INITIAL_DELAY   = 5000;     // 5 s first wait
 const MAX_DELAY       = 20000;    // cap at 20 s per retry
-const RAG_TIMEOUT_MS  = 120000;   // 2 min per request (embedding can take time)
-const RATE_LIMIT_WAIT = 30000;    // 30 s when Render returns 429
+const RAG_TIMEOUT_MS  = 120000;   // 2 min per request
+const RATE_LIMIT_WAIT = 30000;    // 30 s pause inside a chain on 429
+const BLACKOUT_MS     = 60000;    // 60 s global blackout after any 429
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ── Global blackout state ─────────────────────────────────────────────────────
+// When the RAG service rate-limits us, every subsequent request should fail
+// instantly rather than spinning up its own retry chain.
+let _blackoutUntil = 0;
+
+function isBlackedOut() {
+  return Date.now() < _blackoutUntil;
+}
+
+function enterBlackout() {
+  _blackoutUntil = Date.now() + BLACKOUT_MS;
+  console.log(`[ragClient] RAG 429 — entering ${BLACKOUT_MS / 1000}s blackout. All RAG calls will use DB fallback.`);
+}
+
+/**
+ * Is the RAG service currently blacked out due to a recent 429?
+ * Used by controllers to skip RAG entirely and serve cached DB data.
+ */
+function isRagBlackedOut() {
+  return isBlackedOut();
+}
 
 /**
  * Retry-aware axios wrapper for the RAG service.
  *
  * Retries on:
- *  - ECONNREFUSED      – service sleeping / not yet up
- *  - ERR_BAD_RESPONSE  – Render sends an HTML "starting" page (axios can't parse)
- *  - ECONNRESET        – connection dropped mid-start
- *  - ETIMEDOUT         – request timed out
- *  - ENOTFOUND         – DNS not resolved yet
- *  - 5xx responses     – Render gateway errors during wake-up
- *  - 429               – Render rate-limit; waits RATE_LIMIT_WAIT before retrying
+ *  - ECONNREFUSED / ERR_BAD_RESPONSE  – service sleeping / Render "starting" page
+ *  - ECONNRESET / ETIMEDOUT / ENOTFOUND
+ *  - 5xx gateway errors
+ *  - 429 → waits RATE_LIMIT_WAIT before retrying, then enters global blackout
  */
 async function ragRequest(method, path, data = null, params = null) {
+  // Fail instantly while in blackout to prevent pile-ups
+  if (isBlackedOut()) {
+    const err = new Error('RAG service in cooldown (recent 429)');
+    err.code = 'RAG_BLACKOUT';
+    throw err;
+  }
+
   let lastError;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -55,24 +81,30 @@ async function ragRequest(method, path, data = null, params = null) {
       lastError = err;
       const status = err.response?.status;
 
-      // Render rate-limits when too many wake-up requests hit a sleeping service.
-      // Wait a full 30 s before retrying instead of hammering more.
+      // 429 → pause inside this chain, then enter global blackout so other
+      // concurrent chains give up immediately.
       if (status === 429) {
+        enterBlackout();
         if (attempt < MAX_RETRIES) {
           console.log(`[ragClient] Render rate-limited (429). Waiting ${RATE_LIMIT_WAIT / 1000}s...`);
           await sleep(RATE_LIMIT_WAIT);
+          // Check again after waiting — if still blacked out, abort
+          if (isBlackedOut()) {
+            lastError = err;
+            break;
+          }
           continue;
         }
         break;
       }
 
       const isRetryable =
-        err.code === 'ECONNREFUSED'      ||   // sleeping
-        err.code === 'ERR_BAD_RESPONSE'  ||   // Render "starting" HTML page
-        err.code === 'ECONNRESET'        ||   // dropped mid-start
-        err.code === 'ETIMEDOUT'         ||   // timed out
-        err.code === 'ENOTFOUND'         ||   // DNS not ready
-        (status && status >= 500);            // 5xx gateway error
+        err.code === 'ECONNREFUSED'      ||
+        err.code === 'ERR_BAD_RESPONSE'  ||
+        err.code === 'ECONNRESET'        ||
+        err.code === 'ETIMEDOUT'         ||
+        err.code === 'ENOTFOUND'         ||
+        (status && status >= 500);
 
       if (!isRetryable || attempt === MAX_RETRIES) break;
 
@@ -89,9 +121,6 @@ async function ragRequest(method, path, data = null, params = null) {
 }
 
 // ── Deduplicated warmup ───────────────────────────────────────────────────────
-// If warmRagService() is already running (e.g. from warmup endpoint + status
-// poll firing at the same time), share the same promise instead of launching
-// a second parallel retry chain — which is exactly what causes the 429 bursts.
 let _warmupInFlight = null;
 
 async function warmRagService() {
@@ -102,4 +131,4 @@ async function warmRagService() {
   return _warmupInFlight;
 }
 
-module.exports = { ragRequest, warmRagService, RAG_SERVICE_URL };
+module.exports = { ragRequest, warmRagService, isRagBlackedOut, RAG_SERVICE_URL };
