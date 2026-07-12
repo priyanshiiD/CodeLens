@@ -10,6 +10,13 @@ const { warmRagService } = require("./services/ragClient");
 
 dotenv.config();
 
+// Prevent idle-connection crashes: Neon serverless terminates connections after
+// a few minutes of inactivity. Without this handler, the dropped connection
+// emits an unhandled 'error' event that crashes the Node.js process.
+pool.on("error", (err) => {
+  console.error("DB pool error (connection dropped by Neon):", err.message);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -57,7 +64,9 @@ app.get("/", (req, res) => {
 
 async function startServer() {
   try {
-    await pool.connect();
+    // Use pool.query instead of pool.connect so no persistent connection is
+    // held after startup — prevents crashes when Neon drops idle connections.
+    await pool.query("SELECT 1");
     console.log("Connected to PostgreSQL successfully");
 
     app.listen(PORT, () => {
