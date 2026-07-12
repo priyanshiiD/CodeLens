@@ -78,32 +78,43 @@ def _set_stage(status_key: str, stage: str, chunks_total: int = 0) -> None:
 def _generate_suggested_questions(chunks: list, repo_url: str) -> list:
     """
     Generate 4 repo-specific suggested questions via Gemini after indexing.
-    Falls back to generic questions on any error.
+    Retries once after 35 s if the RPM rate limit is hit right after embedding.
+    Falls back to generic questions on any persistent error.
     """
-    try:
-        repo_name = repo_url.rstrip("/").split("/")[-1]
-        sample = random.sample(chunks, min(6, len(chunks)))
-        code_samples = "\n\n---\n\n".join(c.get("text", "")[:400] for c in sample)
+    import time
 
-        client = get_client()
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=(
-                f'You are helping a developer explore the "{repo_name}" codebase.\n'
-                f"Based on these code samples, generate exactly 4 specific questions "
-                f"a developer would ask to understand this codebase.\n\n"
-                f"Code samples:\n{code_samples}\n\n"
-                f"Return ONLY a valid JSON array of exactly 4 question strings. "
-                f'No markdown. Example: ["Q1?", "Q2?", "Q3?", "Q4?"]'
-            ),
-        )
-        questions = json.loads(response.text.strip())
-        if isinstance(questions, list) and len(questions) >= 4:
-            return [str(q) for q in questions[:4]]
-    except Exception as e:
-        print(f"Could not generate suggested questions: {e}")
+    for attempt in range(2):
+        try:
+            repo_name = repo_url.rstrip("/").split("/")[-1]
+            sample = random.sample(chunks, min(6, len(chunks)))
+            code_samples = "\n\n---\n\n".join(c.get("text", "")[:400] for c in sample)
 
-    # Fallback
+            client = get_client()
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=(
+                    f'You are helping a developer explore the "{repo_name}" codebase.\n'
+                    f"Based on these code samples, generate exactly 4 specific questions "
+                    f"a developer would ask to understand this codebase.\n\n"
+                    f"Code samples:\n{code_samples}\n\n"
+                    f"Return ONLY a valid JSON array of exactly 4 question strings. "
+                    f'No markdown. Example: ["Q1?", "Q2?", "Q3?", "Q4?"]'
+                ),
+            )
+            questions = json.loads(response.text.strip())
+            if isinstance(questions, list) and len(questions) >= 4:
+                return [str(q) for q in questions[:4]]
+
+        except Exception as e:
+            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+            if is_rate_limit and attempt == 0:
+                print(f"Suggested questions rate-limited. Retrying in 35s...")
+                time.sleep(35)
+                continue
+            print(f"Could not generate suggested questions: {e}")
+            break
+
+    # Fallback to generic questions
     return [
         "What is the main entry point of this project?",
         "How does authentication work?",

@@ -1,8 +1,7 @@
-import { ArrowLeft, MessageSquare, History, BarChart2, PanelLeftClose, PanelLeft, Zap } from 'lucide-react';
+import { ArrowLeft, History, BarChart2, PanelLeftClose, PanelLeft, Zap } from 'lucide-react';
 import Badge from '../ui/Badge';
 import HistoryPanel from './HistoryPanel';
 import RepoInsights from './RepoInsights';
-import { SUGGESTED_QUESTIONS } from '../../utils/chat';
 
 const TABS = [
   { id: 'chat',     label: 'Suggest',  icon: Zap },
@@ -15,6 +14,7 @@ export default function ChatSidebar({
   historyPairs, onHistorySelect, activeHistoryId,
   onBack, onSuggest, answering, isReady,
   collapsed, onToggleCollapse,
+  suggestedQuestions = [],
 }) {
   if (collapsed) {
     return (
@@ -111,7 +111,7 @@ export default function ChatSidebar({
               <p className="text-xs text-[#6e7681] italic px-1">Indexing in progress…</p>
             ) : (
               <div className="space-y-1">
-                {SUGGESTED_QUESTIONS.map((q, idx) => (
+                {suggestedQuestions.map((q, idx) => (
                   <button
                     key={q}
                     onClick={() => onSuggest(q)}

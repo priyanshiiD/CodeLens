@@ -202,6 +202,7 @@ export default function Chat() {
           isReady={isReady}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+          suggestedQuestions={suggestedQuestions}
         />
       </div>
 
