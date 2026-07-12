@@ -107,6 +107,19 @@ export default function Dashboard() {
     }
   };
 
+  const handleReindex = useCallback(async (repo) => {
+    const toastId = toast.loading('Initiating re-indexing…');
+    try {
+      await apiClient.reindexRepo(repo.repo_url);
+      setRepos((p) =>
+        p.map((r) => (r.id === repo.id ? { ...r, status: 'processing', details: { stage: 'Queued' } } : r))
+      );
+      toast.success('Re-indexing started', { id: toastId });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to start re-indexing', { id: toastId });
+    }
+  }, []);
+
   return (
     <div className="min-h-screen app-bg">
       <TopBar user={user} onLogout={() => { logout(); navigate('/'); }} />
@@ -293,6 +306,7 @@ export default function Dashboard() {
                     index={idx + 1}
                     onChat={(r) => navigate(`/chat?repo=${encodeURIComponent(r.repo_url)}`)}
                     onDelete={confirmDelete}
+                    onReindex={handleReindex}
                   />
                 ))}
               </div>

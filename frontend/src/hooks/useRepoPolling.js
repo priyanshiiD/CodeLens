@@ -21,8 +21,8 @@ export function useRepoPolling(repos, setRepos, intervalMs = 8000) {
 
       const updates = await Promise.allSettled(
         processing.map(async (repo) => {
-          const { status } = await apiClient.getRepoStatus(repo.repo_url);
-          return { id: repo.id, status };
+          const res = await apiClient.getRepoStatus(repo.repo_url);
+          return { id: repo.id, status: res.status, details: res.details };
         })
       );
 
@@ -33,8 +33,11 @@ export function useRepoPolling(repos, setRepos, intervalMs = 8000) {
           const update = updates.find(
             (u) => u.status === 'fulfilled' && u.value.id === repo.id
           );
-          if (update?.status === 'fulfilled' && update.value.status !== repo.status) {
-            return { ...repo, status: update.value.status };
+          if (update?.status === 'fulfilled') {
+            const hasChanged = update.value.status !== repo.status || JSON.stringify(update.value.details) !== JSON.stringify(repo.details);
+            if (hasChanged) {
+              return { ...repo, status: update.value.status, details: update.value.details };
+            }
           }
           return repo;
         })

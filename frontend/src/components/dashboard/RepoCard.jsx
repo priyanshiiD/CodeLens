@@ -1,9 +1,20 @@
-import { Trash2, Database, Calendar, ExternalLink } from 'lucide-react';
+import { Trash2, Database, Calendar, ExternalLink, RotateCw } from 'lucide-react';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { formatDate } from '../../utils/format';
 
-export default function RepoCard({ repo, onChat, onDelete, index }) {
+const getProgressPercent = (stage) => {
+  if (!stage) return 15;
+  if (stage.includes('Cloning')) return 20;
+  if (stage.includes('Extracting')) return 38;
+  if (stage.includes('Chunking')) return 55;
+  if (stage.includes('Embedding')) return 73;
+  if (stage.includes('Storing') || stage.includes('database')) return 88;
+  if (stage.includes('suggestions') || stage.includes('Generating')) return 95;
+  return 15;
+};
+
+export default function RepoCard({ repo, onChat, onDelete, onReindex, index }) {
   const isReady = repo.status === 'completed';
   const isProcessing = repo.status === 'processing';
 
@@ -12,7 +23,10 @@ export default function RepoCard({ repo, onChat, onDelete, index }) {
       {/* Processing progress bar */}
       {isProcessing && (
         <div className="absolute top-0 inset-x-0 h-[2px] bg-[#21262d]">
-          <div className="h-full bg-gradient-to-r from-[#388bfd] to-[#58a6ff] w-2/3 animate-[pulse-subtle_1.8s_ease-in-out_infinite]" />
+          <div 
+            className="h-full bg-gradient-to-r from-[#388bfd] to-[#58a6ff] transition-all duration-500 ease-out" 
+            style={{ width: `${getProgressPercent(repo.details?.stage)}%` }}
+          />
         </div>
       )}
 
@@ -64,7 +78,7 @@ export default function RepoCard({ repo, onChat, onDelete, index }) {
               {isProcessing && (
                 <span className="flex items-center gap-1.5 text-[#d29922]">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#d29922] animate-pulse" />
-                  Indexing in progress…
+                  {repo.details?.stage || 'Indexing in progress…'}
                 </span>
               )}
             </div>
@@ -83,6 +97,15 @@ export default function RepoCard({ repo, onChat, onDelete, index }) {
             <ExternalLink size={12} />
             Open
           </Button>
+          {(isReady || repo.status === 'failed') && onReindex && (
+            <button
+              onClick={() => onReindex(repo)}
+              className="p-1.5 text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#21262d] rounded-md border border-transparent hover:border-[#30363d] transition-all cursor-pointer"
+              title="Re-index repository"
+            >
+              <RotateCw size={14} />
+            </button>
+          )}
           <button
             onClick={() => onDelete(repo)}
             className="p-1.5 text-[#8b949e] hover:text-[#f85149] hover:bg-[#3d1a1a] rounded-md border border-transparent hover:border-[#f85149]/20 transition-all cursor-pointer"

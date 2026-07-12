@@ -80,7 +80,7 @@ async function getRepoStatus(req, res) {
       // If RAG says "processing" but DB already has "completed",
       // the service was restarted — trust the DB (vectors are still in pgvector)
       const dbRow = await pool.query(
-        'SELECT status, chunks_count FROM repos WHERE user_id = $1 AND repo_url = $2',
+        'SELECT status, chunks_count, suggested_questions FROM repos WHERE user_id = $1 AND repo_url = $2',
         [userId, repo_url]
       );
       const dbStatus = dbRow.rows[0]?.status;
@@ -91,12 +91,24 @@ async function getRepoStatus(req, res) {
         details.total_chunks = dbChunks;
       }
 
-      // Update database with latest status and chunks count (only if changing)
-      if (status !== dbStatus) {
+      // Merge suggested questions from DB if RAG doesn't have it (e.g. after a restart)
+      if (status === 'completed') {
+        if (!details.suggested_questions || details.suggested_questions.length === 0) {
+          details.suggested_questions = dbRow.rows[0]?.suggested_questions || [];
+        }
+      }
+
+      // Update database with latest status, chunks count, and suggested questions (only if changing)
+      const dbQuestions = dbRow.rows[0]?.suggested_questions;
+      const hasQuestions = details.suggested_questions && details.suggested_questions.length > 0;
+      const dbHasQuestions = dbQuestions && dbQuestions.length > 0;
+
+      if (status !== dbStatus || (status === 'completed' && hasQuestions && !dbHasQuestions)) {
         const chunksCount = details.total_chunks || 0;
+        const suggestedQuestions = JSON.stringify(details.suggested_questions || []);
         await pool.query(
-          'UPDATE repos SET status = $1, chunks_count = $2 WHERE user_id = $3 AND repo_url = $4',
-          [status, chunksCount, userId, repo_url]
+          'UPDATE repos SET status = $1, chunks_count = $2, suggested_questions = $3 WHERE user_id = $4 AND repo_url = $5',
+          [status, chunksCount, suggestedQuestions, userId, repo_url]
         );
       }
 
@@ -105,11 +117,11 @@ async function getRepoStatus(req, res) {
       console.error('RAG service status error:', err.message);
       // Fallback: return DB status if RAG is unavailable
       const dbRow = await pool.query(
-        'SELECT status, chunks_count FROM repos WHERE user_id = $1 AND repo_url = $2',
+        'SELECT status, chunks_count, suggested_questions FROM repos WHERE user_id = $1 AND repo_url = $2',
         [userId, repo_url]
       );
       if (dbRow.rows[0]) {
-        return res.json({ status: dbRow.rows[0].status, details: { total_chunks: dbRow.rows[0].chunks_count } });
+        return res.json({ status: dbRow.rows[0].status, details: { total_chunks: dbRow.rows[0].chunks_count, suggested_questions: dbRow.rows[0].suggested_questions || [] } });
       }
       return res.status(503).json({ error: 'RAG service unavailable' });
     }
@@ -160,9 +172,57 @@ async function deleteRepo(req, res) {
   }
 }
 
+async function reindexRepo(req, res) {
+  try {
+    const { repo_url } = req.body || {};
+    const userId = req.user.userId;
+
+    if (!repo_url) {
+      return res.status(400).json({ error: 'repo_url is required' });
+    }
+
+    // Verify repo belongs to user
+    const repoCheck = await pool.query(
+      'SELECT id FROM repos WHERE user_id = $1 AND repo_url = $2',
+      [userId, repo_url]
+    );
+
+    if (repoCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Repo not found' });
+    }
+
+    // Set database status back to processing and reset stats
+    await pool.query(
+      "UPDATE repos SET status = 'processing', chunks_count = 0, suggested_questions = '[]'::jsonb WHERE user_id = $1 AND repo_url = $2",
+      [userId, repo_url]
+    );
+
+    // Call RAG service to delete existing chunks and start ingestion again
+    try {
+      await warmRagService();
+      const encoded = encodeURIComponent(repo_url);
+      
+      // Delete old chunks first
+      await ragRequest('delete', `/api/ingest/${encoded}`);
+      
+      // Request re-ingestion
+      await ragRequest('post', '/api/ingest', { repo_url });
+    } catch (err) {
+      console.error('RAG service reindex error:', err.message);
+      // Even if RAG connection fails, backend state is updated
+    }
+
+    return res.json({ message: 'Repository re-indexing started successfully' });
+  } catch (err) {
+    console.error('Reindex repo error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   addRepo,
   getRepos,
   getRepoStatus,
   deleteRepo,
+  reindexRepo,
 };

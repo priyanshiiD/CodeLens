@@ -5,6 +5,7 @@ import { ArrowUp, Menu, Trash2 } from 'lucide-react';
 import * as apiClient from '../api/client';
 import { formatChatHistory, getHistoryPairs, SUGGESTED_QUESTIONS } from '../utils/chat';
 import { getRepoName } from '../utils/format';
+import { useRagWarmup } from '../hooks/useRagWarmup';
 import ChatSidebar from '../components/chat/ChatSidebar';
 import MessageBubble from '../components/chat/MessageBubble';
 import TypingIndicator from '../components/chat/TypingIndicator';
@@ -32,9 +33,20 @@ export default function Chat() {
   const messagesEndRef = useRef(null);
   const lastAiMsgRef = useRef(null);
   const inputRef = useRef(null);
+  
+  // Keep RAG service warm while chatting
+  useRagWarmup();
+
   const historyPairs = useMemo(() => getHistoryPairs(messages), [messages]);
   const repoName = getRepoName(repoUrl);
   const isReady = repoStatus === 'completed';
+
+  const suggestedQuestions = useMemo(() => {
+    if (repoDetails?.suggested_questions && repoDetails.suggested_questions.length > 0) {
+      return repoDetails.suggested_questions;
+    }
+    return SUGGESTED_QUESTIONS;
+  }, [repoDetails]);
 
   const scrollToBottom = useCallback(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), []);
   const scrollToMessage = useCallback((id) => {
@@ -114,15 +126,32 @@ export default function Chat() {
     setQuestion('');
     // Reset textarea height
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
+    
+    let warmupTimeout;
     try {
       setAnswering(true);
+      
+      // If the response takes > 3.5 seconds, the RAG service is likely waking up from cold start
+      warmupTimeout = setTimeout(() => {
+        toast('Warming up the AI engine. Please wait...', {
+          icon: '⚡',
+          duration: 4000,
+          id: 'rag-warmup-toast'
+        });
+      }, 3500);
+
       const res = await apiClient.askQuestion(repoUrl, trimmed);
+      clearTimeout(warmupTimeout);
+      toast.dismiss('rag-warmup-toast');
+
       setMessages((p) => [...p, {
         id: `ai-${Date.now()}`, role: 'assistant',
         answer: res.answer, sources: res.sources || [],
         chunks_used: res.chunks_used, created_at: new Date().toISOString(),
       }]);
     } catch (e) {
+      clearTimeout(warmupTimeout);
+      toast.dismiss('rag-warmup-toast');
       const err = e.response?.data?.error || 'Failed to generate answer';
       setMessages((p) => [...p, { id: `err-${Date.now()}`, role: 'assistant', error: err, created_at: new Date().toISOString() }]);
     } finally {
@@ -232,7 +261,7 @@ export default function Chat() {
 
                 {isReady && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {SUGGESTED_QUESTIONS.slice(0, 4).map((q) => (
+                    {suggestedQuestions.slice(0, 4).map((q) => (
                       <button
                         key={q}
                         onClick={() => sendQuestion(q)}

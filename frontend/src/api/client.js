@@ -79,3 +79,8 @@ export async function warmupRagService() {
   const response = await client.get('/api/rag/warmup');
   return response.data;
 }
+
+export async function reindexRepo(repo_url) {
+  const response = await client.post('/api/repos/reindex', { repo_url });
+  return response.data;
+}

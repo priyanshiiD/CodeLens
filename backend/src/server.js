@@ -67,7 +67,8 @@ async function startServer() {
     // Use pool.query instead of pool.connect so no persistent connection is
     // held after startup — prevents crashes when Neon drops idle connections.
     await pool.query("SELECT 1");
-    console.log("Connected to PostgreSQL successfully");
+    await pool.query("ALTER TABLE repos ADD COLUMN IF NOT EXISTS suggested_questions JSONB DEFAULT '[]'");
+    console.log("Connected to PostgreSQL and database schema verified successfully");
 
     app.listen(PORT, () => {
       console.log(`CodeLens Backend running on port ${PORT}`);
