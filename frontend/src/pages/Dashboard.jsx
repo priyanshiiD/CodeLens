@@ -5,6 +5,7 @@ import { Plus, BookOpen, X, Search, AlertCircle, CheckCircle2 } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 import * as apiClient from '../api/client';
 import { useRepoPolling } from '../hooks/useRepoPolling';
+import { useRagWarmup } from '../hooks/useRagWarmup';
 import TopBar from '../components/layout/TopBar';
 import StatCard from '../components/dashboard/StatCard';
 import RepoCard from '../components/dashboard/RepoCard';
@@ -40,6 +41,10 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [deleteTarget, setDeleteTarget] = useState(null); // repo to confirm delete
+
+  // Warm up the RAG service as soon as the dashboard mounts (90 s cooldown,
+  // deduped) so it's ready before the user adds a repo or starts chatting.
+  useRagWarmup();
 
   useEffect(() => {
     apiClient.getRepos()

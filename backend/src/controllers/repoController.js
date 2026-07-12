@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { ragRequest } = require('../services/ragClient');
+const { ragRequest, warmRagService } = require('../services/ragClient');
 
 async function addRepo(req, res) {
   try {
@@ -15,6 +15,7 @@ async function addRepo(req, res) {
 
     // Call RAG service to start ingestion (retries on Render cold-start)
     try {
+      await warmRagService();
       await ragRequest('post', '/api/ingest', { repo_url });
     } catch (err) {
       console.error('RAG service error:', err.message);
@@ -69,7 +70,6 @@ async function getRepoStatus(req, res) {
       return res.status(404).json({ error: 'Repo not found' });
     }
 
-
     // Call RAG service for status (retries on Render cold-start)
     try {
       const encoded = encodeURIComponent(repo_url);
@@ -78,7 +78,7 @@ async function getRepoStatus(req, res) {
       const details = ragResponse.data.details || {};
 
       // If RAG says "processing" but DB already has "completed",
-      // the service was restarted — trust the DB (vectors are still in ChromaDB)
+      // the service was restarted — trust the DB (vectors are still in pgvector)
       const dbRow = await pool.query(
         'SELECT status, chunks_count FROM repos WHERE user_id = $1 AND repo_url = $2',
         [userId, repo_url]
@@ -146,6 +146,7 @@ async function deleteRepo(req, res) {
 
     // Call RAG service to delete chunks (retries on Render cold-start)
     try {
+      await warmRagService();
       const encoded = encodeURIComponent(repo_url);
       await ragRequest('delete', `/api/ingest/${encoded}`);
     } catch (err) {

@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth");
 const repoRoutes = require("./routes/repos");
 const chatRoutes = require("./routes/chat");
 const pool = require("./config/db");
+const { warmRagService } = require("./services/ragClient");
 
 dotenv.config();
 
@@ -32,6 +33,19 @@ app.use(
   })
 );
 app.use(express.json());
+
+app.get("/api/rag/warmup", async (req, res) => {
+  try {
+    await warmRagService();
+    return res.json({ status: "ready" });
+  } catch (error) {
+    console.error("RAG warmup error:", error.code || error.message);
+    return res.status(202).json({
+      status: "warming",
+      error: error.code || error.message,
+    });
+  }
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/repos", repoRoutes);

@@ -168,7 +168,9 @@ def embed_text_batch(texts: List[str], retries: int = 0) -> List[List[float]]:
         
     except Exception as e:
         if retries < MAX_RETRIES:
-            delay = 5 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) else RETRY_DELAY
+            # Gemini rate-limit errors say "retry in ~40-60 s"; wait 65 s to be safe.
+            # Other errors use the standard short delay.
+            delay = 65 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) else RETRY_DELAY
             print(
                 f"Batch embedding failed (attempt {retries + 1}/{MAX_RETRIES}), "
                 f"retrying in {delay}s... Error: {str(e)}"

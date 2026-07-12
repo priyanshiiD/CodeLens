@@ -74,3 +74,8 @@ export async function deleteRepo(repo_url) {
   const response = await client.delete('/api/repos', { params: { repo_url } });
   return response.data;
 }
+
+export async function warmupRagService() {
+  const response = await client.get('/api/rag/warmup');
+  return response.data;
+}

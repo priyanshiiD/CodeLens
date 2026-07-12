@@ -70,4 +70,8 @@ async function ragRequest(method, path, data = null, params = null) {
   throw lastError;
 }
 
-module.exports = { ragRequest, RAG_SERVICE_URL };
+async function warmRagService() {
+  return ragRequest('get', '/health');
+}
+
+module.exports = { ragRequest, warmRagService, RAG_SERVICE_URL };

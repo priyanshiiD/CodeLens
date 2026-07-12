@@ -15,7 +15,7 @@ from app.api.chat import router as chat_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage app lifecycle - restore state on startup."""
-    # Startup: restore ingestion status from ChromaDB
+    # Startup: restore ingestion status from PostgreSQL
     await restore_ingestion_status()
     yield
     # Shutdown: cleanup if needed

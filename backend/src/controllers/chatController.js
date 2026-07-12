@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { ragRequest } = require('../services/ragClient');
+const { ragRequest, warmRagService } = require('../services/ragClient');
 
 async function askQuestion(req, res) {
   try {
@@ -25,6 +25,7 @@ async function askQuestion(req, res) {
     // Call RAG service (retries on Render cold-start)
     let ragResponse;
     try {
+      await warmRagService();
       ragResponse = await ragRequest('post', '/api/chat', {
         repo_url,
         question,

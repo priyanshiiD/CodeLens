@@ -118,8 +118,8 @@ def _ingest_repository(repo_url: str) -> None:
         
         print(f"  Embedded {len(embedded_chunks)} chunks")
         
-        # Step 5: Store in ChromaDB
-        print(f"  [5/5] Storing in ChromaDB...")
+        # Step 5: Store in pgvector
+        print(f"  [5/5] Storing in pgvector...")
         stored_count = store_chunks(embedded_chunks, repo_url)
         
         print(f"Successfully ingested {repo_url}: {stored_count} chunks stored")
@@ -261,7 +261,7 @@ async def get_ingestion_status(repo_url: str) -> StatusResponse:
 @router.delete("/{repo_url:path}", response_model=DeleteResponse)
 async def delete_ingested_repo(repo_url: str) -> DeleteResponse:
     """
-    Delete all chunks for a repository from ChromaDB.
+    Delete all chunks for a repository from pgvector (PostgreSQL).
 
     Args:
         repo_url: GitHub repository URL (URL encoded in path)
@@ -276,7 +276,7 @@ async def delete_ingested_repo(repo_url: str) -> DeleteResponse:
     repo_url = unquote(repo_url)
     
     try:
-        # Delete from ChromaDB
+        # Delete from pgvector
         chunks_deleted = delete_repo(repo_url)
         
         # Remove from status tracker
